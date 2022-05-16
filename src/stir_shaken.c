@@ -517,13 +517,14 @@ void stir_shaken_destroy_context(stir_shaken_context_t *ss)
 	memset(ss, 0, sizeof(*ss));
 }
 
-size_t stir_shaken_hash_hash(size_t hashsize, size_t key)
+size_t stir_shaken_hash_hash(size_t hashsize, char * key)
 {
+    unsigned long long long_key = *(unsigned long long) key;
 	if (hashsize < 1) return 0;
-	return key % hashsize;
+	return (key & 0x0000FFFF) % hashsize;
 }
 
-stir_shaken_hash_entry_t* stir_shaken_hash_entry_find(stir_shaken_hash_entry_t **hash, size_t hashsize, size_t key)
+stir_shaken_hash_entry_t* stir_shaken_hash_entry_find(stir_shaken_hash_entry_t **hash, size_t hashsize, char * key)
 {
 	size_t idx = 0;
 	stir_shaken_hash_entry_t *e = NULL;
@@ -534,14 +535,14 @@ stir_shaken_hash_entry_t* stir_shaken_hash_entry_find(stir_shaken_hash_entry_t *
 	e = hash[idx];
 
 	do {	
-		if (e && e->key == key)
+		if (e && strcmp(e->key, key) == 0)
 			return e;
 	} while (e && (e = e->next));
 
 	return NULL;
 }
 
-stir_shaken_hash_entry_t* stir_shaken_hash_entry_create(size_t key, void *data, int datalen, stir_shaken_hash_entry_destructor dctor, int hash_copy_type)
+stir_shaken_hash_entry_t* stir_shaken_hash_entry_create(char * key, void *data, int datalen, stir_shaken_hash_entry_destructor dctor, int hash_copy_type)
 {
 	stir_shaken_hash_entry_t *entry = NULL;
 
@@ -550,7 +551,7 @@ stir_shaken_hash_entry_t* stir_shaken_hash_entry_create(size_t key, void *data, 
 		return NULL;
 	memset(entry, 0, sizeof(*entry));
 
-	entry->key = key;
+	strcpy(entry->key, key);
 	if ((hash_copy_type == STIR_SHAKEN_HASH_TYPE_SHALLOW) || (hash_copy_type == STIR_SHAKEN_HASH_TYPE_SHALLOW_AUTOFREE)) {
 		entry->data = data;
 	} else {
@@ -582,7 +583,7 @@ void stir_shaken_hash_entry_destroy(stir_shaken_hash_entry_t *e, int hash_copy_t
 	free(e);
 }
 
-stir_shaken_hash_entry_t* stir_shaken_hash_entry_add(stir_shaken_hash_entry_t **hash, size_t hashsize, size_t key, void *data, int datalen, stir_shaken_hash_entry_destructor dctor, int hash_copy_type)
+stir_shaken_hash_entry_t* stir_shaken_hash_entry_add(stir_shaken_hash_entry_t **hash, size_t hashsize, char * key, void *data, int datalen, stir_shaken_hash_entry_destructor dctor, int hash_copy_type)
 {
 	size_t idx = 0;
 	stir_shaken_hash_entry_t *e = NULL, *entry = NULL;
@@ -614,7 +615,7 @@ stir_shaken_hash_entry_t* stir_shaken_hash_entry_add(stir_shaken_hash_entry_t **
 	return entry;
 }
 
-stir_shaken_status_t stir_shaken_hash_entry_remove(stir_shaken_hash_entry_t **hash, size_t hashsize, size_t key, int hash_copy_type)
+stir_shaken_status_t stir_shaken_hash_entry_remove(stir_shaken_hash_entry_t **hash, size_t hashsize, char * key, int hash_copy_type)
 {
 	size_t idx = 0;
 	stir_shaken_hash_entry_t *e = NULL, *prev = NULL;
@@ -626,7 +627,7 @@ stir_shaken_status_t stir_shaken_hash_entry_remove(stir_shaken_hash_entry_t **ha
 
 	do {
 		if (!e) return STIR_SHAKEN_STATUS_FALSE;		
-		if (e->key == key) {
+		if (strcmp(e->key, key) == 0) {
 			if (prev) {
 				prev->next = e->next;
 			} else {

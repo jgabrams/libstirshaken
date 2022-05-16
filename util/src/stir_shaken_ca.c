@@ -142,7 +142,7 @@ static void close_http_connection(struct mg_connection *nc, struct mbuf *io)
 	if (nc) nc->flags |= MG_F_SEND_AND_CLOSE;
 }
 
-static stir_shaken_ca_session_t* stir_shaken_ca_session_create(size_t sp_code, char *authz_challenge, void *csr_pem, uint8_t use_ssl)
+static stir_shaken_ca_session_t* stir_shaken_ca_session_create(char * sp_code, char *authz_challenge, void *csr_pem, uint8_t use_ssl)
 {
 	stir_shaken_ca_session_t *session = malloc(sizeof(stir_shaken_ca_session_t));
 
@@ -150,7 +150,7 @@ static stir_shaken_ca_session_t* stir_shaken_ca_session_create(size_t sp_code, c
 		return NULL;
 
 	memset(session, 0, sizeof(*session));
-	session->spc = sp_code;
+	strcpy(session->spc, sp_code);
 	session->authz_challenge = strdup(authz_challenge);
 	session->state = STI_CA_SESSION_STATE_INIT;
 	session->sp.csr.pem = strdup(csr_pem);
@@ -322,7 +322,6 @@ stir_shaken_status_t ca_sp_cert_req_reply_challenge(stir_shaken_context_t *ss, s
 	jwt_t *jwt = NULL;
 	const char *spc = NULL;
 	char *pCh = NULL;
-	unsigned long long  int sp_code = 0;
 	const char *csr_b64 = NULL;
 	char csr[STIR_SHAKEN_BUFLEN] = { 0 };
 	stir_shaken_hash_entry_t *e = NULL;
@@ -357,27 +356,11 @@ stir_shaken_status_t ca_sp_cert_req_reply_challenge(stir_shaken_context_t *ss, s
 		goto fail;
 	}
 
-	sp_code = strtoul(spc, &pCh, 10); 
-	if (sp_code > 0x10000 - 1) { 
-		stir_shaken_set_error(ss, "SPC number too big", STIR_SHAKEN_ERROR_ACME_SPC_TOO_BIG);
-		goto fail; 
-	}
-
-	if (*pCh != '\0') { 
-		stir_shaken_set_error(ss, "SPC invalid", STIR_SHAKEN_ERROR_ACME_SPC_INVALID);
-		goto fail; 
-	}
-
-	if (stir_shaken_b64_decode(csr_b64, csr, sizeof(csr)) < 1 || stir_shaken_zstr(csr)) {
-		stir_shaken_set_error(&ca->ss, "Cannot decode CSR from base 64", STIR_SHAKEN_ERROR_ACME);
-		goto fail;
-	}
-
 	fprintif(STIR_SHAKEN_LOGLEVEL_MEDIUM, "-> CSR is:\n%s\n", csr);
 	fprintif(STIR_SHAKEN_LOGLEVEL_MEDIUM, "-> SPC (from cert request jwt) is: %s\n", spc);
 
 	// This check probably should be disabled, as it opens possibility of DoS attack
-	e = stir_shaken_hash_entry_find(ca->sessions, CA_SESSIONS_MAX, sp_code);
+	e = stir_shaken_hash_entry_find(ca->sessions, CA_SESSIONS_MAX, spc);
 	if (e) {
 
 		session = e->data;
@@ -393,7 +376,7 @@ stir_shaken_status_t ca_sp_cert_req_reply_challenge(stir_shaken_context_t *ss, s
 		}
 
 		// expired, remove
-		stir_shaken_hash_entry_remove(ca->sessions, CA_SESSIONS_MAX, sp_code, STIR_SHAKEN_HASH_TYPE_SHALLOW_AUTOFREE);
+		stir_shaken_hash_entry_remove(ca->sessions, CA_SESSIONS_MAX, spc, STIR_SHAKEN_HASH_TYPE_SHALLOW_AUTOFREE);
 	}
 
 	fprintif(STIR_SHAKEN_LOGLEVEL_MEDIUM, "\t-> Requesting authorization...\n");
@@ -478,7 +461,7 @@ static void ca_handle_api_cert(struct mg_connection *nc, int event, void *hm, vo
 
 	const char *spc = NULL;
 	char *pCh = NULL;
-	unsigned long long  int sp_code = 0;
+	char sp_code[STIR_SHAKEN_BUFLEN];
 	const char *csr_b64 = NULL;
 	int csr_len = 0;
 	char *token = NULL;
@@ -549,7 +532,7 @@ static void ca_handle_api_cert(struct mg_connection *nc, int event, void *hm, vo
 
 					// Handle certificate download request
 
-					if ((STIR_SHAKEN_STATUS_OK != stir_shaken_acme_api_uri_to_spc(&ca->ss, m->uri.p, cert_api_url.p, spcbuf, STIR_SHAKEN_BUFLEN, &sp_code, &uri_has_secret, &secret)) || stir_shaken_zstr(spcbuf)) {
+					if ((STIR_SHAKEN_STATUS_OK != stir_shaken_acme_api_uri_to_spc(&ca->ss, m->uri.p, cert_api_url.p, spcbuf, STIR_SHAKEN_BUFLEN, sp_code, &uri_has_secret, &secret)) || stir_shaken_zstr(spcbuf)) {
 						stir_shaken_set_error(&ca->ss, "Bad cert request, SPC is missing", STIR_SHAKEN_ERROR_ACME_CERT);
 						goto fail;
 					}
@@ -733,10 +716,9 @@ stir_shaken_status_t ca_extract_spc_token_from_authz_response(stir_shaken_contex
 	return STIR_SHAKEN_STATUS_OK;
 }
 
-stir_shaken_status_t ca_verify_spc(stir_shaken_context_t *ss, jwt_t *spc_jwt, unsigned long long int spc)
+stir_shaken_status_t ca_verify_spc(stir_shaken_context_t *ss, jwt_t *spc_jwt, char * spc)
 {
 	char *pCh = NULL;
-	unsigned long long int sp_code = 0;
 	const char *spc_str = NULL;
 	char err_buf[STIR_SHAKEN_ERROR_BUF_LEN] = { 0 };
 
@@ -746,26 +728,16 @@ stir_shaken_status_t ca_verify_spc(stir_shaken_context_t *ss, jwt_t *spc_jwt, un
 		return STIR_SHAKEN_STATUS_FALSE;
 	}
 
-	sp_code = strtoul(spc_str, &pCh, 10); 
-	if (sp_code > 0x10000 - 1) { 
-		stir_shaken_set_error(ss, "SPC number too big", STIR_SHAKEN_ERROR_ACME_SPC_TOO_BIG);
-		return STIR_SHAKEN_STATUS_FALSE;
-	}
+	fprintif(STIR_SHAKEN_LOGLEVEL_MEDIUM, "\t\t -> SPC (from SPC token) is: %s\n", spc_str);
+	fprintif(STIR_SHAKEN_LOGLEVEL_MEDIUM, "\t\t -> SPC (from session) is: %s\n", spc);
 
-	if (*pCh != '\0') { 
-		stir_shaken_set_error(ss, "SPC invalid", STIR_SHAKEN_ERROR_ACME_SPC_INVALID);
-		return STIR_SHAKEN_STATUS_FALSE;
-	}
-
-	fprintif(STIR_SHAKEN_LOGLEVEL_MEDIUM, "\t\t -> SPC (from SPC token) is: %llu\n", sp_code);
-	fprintif(STIR_SHAKEN_LOGLEVEL_MEDIUM, "\t\t -> SPC (from session) is: %llu\n", spc);
-
-	if (sp_code != spc) {
-		snprintf(err_buf, STIR_SHAKEN_BUFLEN, "SPC from SPC token (%llu) does not match this session SPC (%llu) (was cert request initiated for different SPC?)", sp_code, spc);
+	if (strcmp(sp_code, spc) != 0) {
+		snprintf(err_buf, STIR_SHAKEN_BUFLEN, "SPC from SPC token (%s) does not match this session SPC (%s) (was cert request initiated for different SPC?)", spc_str, spc);
 		stir_shaken_set_error(ss, err_buf, STIR_SHAKEN_ERROR_ACME_SPC_INVALID);
+		return STIR_SHAKEN_STATUS_FALSE;
 	}
 
-	return sp_code == spc ? STIR_SHAKEN_STATUS_OK : STIR_SHAKEN_STATUS_FALSE;
+	return STIR_SHAKEN_STATUS_OK;
 }
 
 stir_shaken_status_t ca_verify_pa_cert(stir_shaken_context_t *ss, stir_shaken_ca_t *ca, stir_shaken_cert_t *cert)
@@ -821,7 +793,7 @@ static void ca_handle_api_authz(struct mg_connection *nc, int event, void *hm, v
 
 	char spc[STIR_SHAKEN_BUFLEN] = { 0 };
 	char *pCh = NULL;
-	unsigned long long int sp_code = 0;
+	char sp_code[STIR_SHAKEN_BUFLEN];
 	char *token = NULL;
 	char authz_url[STIR_SHAKEN_BUFLEN] = { 0 };
 	char *authz_challenge_details = NULL;
@@ -862,7 +834,7 @@ static void ca_handle_api_authz(struct mg_connection *nc, int event, void *hm, v
 		case MG_EV_HTTP_REQUEST:
 
 			{
-				if ((STIR_SHAKEN_STATUS_OK != stir_shaken_acme_api_uri_to_spc(&ca->ss, m->uri.p, authz_api_url.p, spc, STIR_SHAKEN_BUFLEN, &sp_code, &uri_has_secret, &secret)) || stir_shaken_zstr(spc)) {
+				if ((STIR_SHAKEN_STATUS_OK != stir_shaken_acme_api_uri_to_spc(&ca->ss, m->uri.p, authz_api_url.p, spc, STIR_SHAKEN_BUFLEN, sp_code, &uri_has_secret, &secret)) || stir_shaken_zstr(spc)) {
 					stir_shaken_set_error(&ca->ss, "Bad AUTHZ request, SPC missing or invalid", STIR_SHAKEN_ERROR_ACME_AUTHZ_SPC);
 					goto fail;
 				}
@@ -946,7 +918,7 @@ static void ca_handle_api_authz(struct mg_connection *nc, int event, void *hm, v
 					char *spc_jwt_str = NULL;
 					const char *spc_str = NULL;
 					const char *spc_token = NULL;
-					unsigned long long  int sp_code = 0;
+					char sp_code[STIR_SHAKEN_BUFLEN];
 					const char *cert_url = NULL;
 
 					if (!uri_has_secret) {

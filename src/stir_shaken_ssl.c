@@ -399,7 +399,7 @@ stir_shaken_status_t stir_shaken_sign_x509_req(stir_shaken_context_t *ss, X509_R
     return STIR_SHAKEN_STATUS_OK;
 }
 
-stir_shaken_status_t stir_shaken_generate_csr(stir_shaken_context_t *ss, uint32_t sp_code, X509_REQ **csr_req, EVP_PKEY *private_key, EVP_PKEY *public_key, const char *subject_c, const char *subject_cn)
+stir_shaken_status_t stir_shaken_generate_csr(stir_shaken_context_t *ss, char * sp_code, X509_REQ **csr_req, EVP_PKEY *private_key, EVP_PKEY *public_key, const char *subject_c, const char *subject_cn)
 {
     X509_REQ *req = NULL;
 
@@ -816,12 +816,9 @@ stir_shaken_status_t stir_shaken_x509_add_signalwire_extensions(stir_shaken_cont
     return STIR_SHAKEN_STATUS_OK;
 }
 
-stir_shaken_status_t stir_shaken_x509_req_add_tnauthlist_extension_spc(stir_shaken_context_t *ss, X509_REQ *req, unsigned long long int spc)
+stir_shaken_status_t stir_shaken_x509_req_add_tnauthlist_extension_spc(stir_shaken_context_t *ss, X509_REQ *req, char * spc)
 {
-    char buf[100] = { 0 };
-
-    snprintf(buf, 100, "%llu", spc);
-    return stir_shaken_v3_add_ext(NULL, NULL, req, NULL, stir_shaken_globals.tn_authlist_nid, buf);
+    return stir_shaken_v3_add_ext(NULL, NULL, req, NULL, stir_shaken_globals.tn_authlist_nid, spc);
 }
 
 stir_shaken_status_t stir_shaken_x509_add_tnauthlist_extension_uri(stir_shaken_context_t *ss, X509 *ca_x, X509 *x, char *uri)

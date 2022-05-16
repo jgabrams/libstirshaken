@@ -181,7 +181,7 @@ static struct pa {
 	char nb[STIR_SHAKEN_BUFLEN];
 	char na[STIR_SHAKEN_BUFLEN];
 	char file_name[STIR_SHAKEN_BUFLEN];
-	size_t sp_code;
+	char sp_code[STIR_SHAKEN_BUFLEN];
 } pa;
 
 static struct sp {

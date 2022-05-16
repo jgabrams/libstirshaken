@@ -1053,7 +1053,7 @@ X509_REQ* stir_shaken_load_x509_req_from_file(stir_shaken_context_t *ss, const c
 X509_REQ* stir_shaken_generate_x509_req(stir_shaken_context_t *ss, const char *subject_c, const char *subject_cn);
 X509_REQ* stir_shaken_load_x509_req_from_pem(stir_shaken_context_t *ss, char *pem);
 stir_shaken_status_t stir_shaken_sign_x509_req(stir_shaken_context_t *ss, X509_REQ *req, EVP_PKEY *private_key);
-stir_shaken_status_t stir_shaken_generate_csr(stir_shaken_context_t *ss, uint32_t sp_code, X509_REQ **csr_req, EVP_PKEY *private_key, EVP_PKEY *public_key, const char *subject_c, const char *subject_cn);
+stir_shaken_status_t stir_shaken_generate_csr(stir_shaken_context_t *ss, char * sp_code, X509_REQ **csr_req, EVP_PKEY *private_key, EVP_PKEY *public_key, const char *subject_c, const char *subject_cn);
 stir_shaken_status_t stir_shaken_csr_to_disk(stir_shaken_context_t *ss, X509_REQ *csr_req, const char *csr_full_name);
 void stir_shaken_destroy_csr_req(X509_REQ **csr_req);
 void stir_shaken_destroy_csr(stir_shaken_csr_t *csr);
@@ -1265,7 +1265,7 @@ char* stir_shaken_acme_generate_auth_challenge_response(stir_shaken_context_t *s
 char* stir_shaken_acme_generate_auth_challenge_details(stir_shaken_context_t *ss, char *status, const char *spc, const char *token, const char *authz_url);
 char* stir_shaken_acme_generate_auth_polling_status(stir_shaken_context_t *ss, char *status, char *expires, char *validated, const char *spc, const char *token, const char *authz_url);
 char* stir_shaken_acme_generate_new_account_req_payload(stir_shaken_context_t *ss, char *jwk, char *nonce, char *url, char *contact_mail, char *contact_tel, unsigned char *key, uint32_t keylen, char **json);
-stir_shaken_status_t stir_shaken_acme_api_uri_to_spc(stir_shaken_context_t *ss, const char *uri_request, const char *api_url, char *buf, int buflen, unsigned long long int *sp_code, int *uri_has_secret, unsigned long long *secret);
+stir_shaken_status_t stir_shaken_acme_api_uri_to_spc(stir_shaken_context_t *ss, const char *uri_request, const char *api_url, char *buf, int buflen, char *sp_code, int *uri_has_secret, unsigned long long *secret);
 stir_shaken_status_t stir_shaken_acme_api_uri_parse(stir_shaken_context_t *ss, const char *uri_request, const char *api_url, char *arg1, int arg1_len, char *arg2, int arg2_len, int *args_n);
 char* stir_shaken_acme_generate_spc_token(stir_shaken_context_t *ss, char *issuer, char *url, char *nb, char *na, char *spc, unsigned char *key, uint32_t keylen, char **json);
 
@@ -1418,7 +1418,7 @@ const char* stir_shaken_get_error(stir_shaken_context_t *ss, stir_shaken_error_t
 typedef void (*stir_shaken_hash_entry_destructor)(void*);
 
 typedef struct stir_shaken_hash_entry_s {
-	size_t key;
+	char key[STIR_SHAKEN_BUFLEN];
 	void *data;
 	stir_shaken_hash_entry_destructor dctor;
 	struct stir_shaken_hash_entry_s *next;
@@ -1471,7 +1471,7 @@ typedef struct stir_shaken_sp_s {
 
 typedef struct stir_shaken_ca_session_s {
 	int state;
-	unsigned long long int spc;
+	char * spc;
 	unsigned long long authz_secret;
 	char *nonce;
 	char *authz_url;

@@ -181,10 +181,9 @@ stir_shaken_status_t stirshaken_command_validate(stir_shaken_context_t *ss, int 
 				goto fail;
 			}
 
-			STIR_SHAKEN_CHECK_CONVERSION_EXT
-				sp->sp.code = helper;
+            strcpy(pa->sp_code, sp->spc);
 
-			break;
+            break;
 
 		case COMMAND_CERT_CA:
 
@@ -240,9 +239,9 @@ stir_shaken_status_t stirshaken_command_validate(stir_shaken_context_t *ss, int 
 				goto fail;
 			}
 
-			STIR_SHAKEN_CHECK_CONVERSION_EXT
-				pa->sp_code = helper;
-			break;
+            strcpy(pa->sp_code, sp->spc);
+
+            break;
 
 		case COMMAND_CA:
 
@@ -291,9 +290,9 @@ stir_shaken_status_t stirshaken_command_validate(stir_shaken_context_t *ss, int 
 				goto fail;
 			}
 
-			STIR_SHAKEN_CHECK_CONVERSION_EXT
-				sp->sp.code = helper;
-			break;
+            strcpy(pa->sp_code, sp->spc);
+
+            break;
 
 
 		case COMMAND_JWT_KEY_CHECK:
